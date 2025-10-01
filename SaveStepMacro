@@ -1,0 +1,63 @@
+Option Explicit
+
+Sub main()
+    Dim swApp As Object
+    Dim swModel As Object
+    Dim swExt As Object
+    
+    On Error Resume Next
+    Set swApp = Application.SldWorks ' werkt wanneer gestart vanuit SW
+    If swApp Is Nothing Then
+        ' fallback als macro buiten SW wordt gestart
+        Set swApp = CreateObject("SldWorks.Application")
+    End If
+    On Error GoTo 0
+    
+    If swApp Is Nothing Then
+        MsgBox "Kon SolidWorks niet bereiken.", vbCritical
+        Exit Sub
+    End If
+    
+    Set swModel = swApp.ActiveDoc
+    If swModel Is Nothing Then
+        MsgBox "Geen document geopend.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 1 = Part, 2 = Assembly, 3 = Drawing
+    Dim docType As Long
+    docType = swModel.GetType
+    If docType <> 1 And docType <> 2 Then
+        MsgBox "Alleen PART of ASSEMBLY kan naar STEP worden geëxporteerd (geen Drawing).", vbExclamation
+        Exit Sub
+    End If
+    
+    Dim currentPath As String
+    currentPath = swModel.GetPathName
+    If Len(currentPath) = 0 Then
+        MsgBox "Het document is nog niet opgeslagen. Sla eerst op als .sldprt of .sldasm.", vbExclamation
+        Exit Sub
+    End If
+    
+    Dim folderPath As String, baseName As String, stepPath As String
+    folderPath = Left$(currentPath, InStrRev(currentPath, "\"))
+    baseName = Mid$(currentPath, InStrRev(currentPath, "\") + 1)
+    If InStrRev(baseName, ".") > 0 Then baseName = Left$(baseName, InStrRev(baseName, ".") - 1)
+    stepPath = folderPath & baseName & ".step"  ' desgewenst ".stp"
+    
+    Set swExt = swModel.Extension
+    
+    ' Stille export: SaveAs via Extension. Zonder typed ExportData (Nothing).
+    Dim errs As Long, warns As Long
+    Dim ok As Boolean
+    ok = swExt.SaveAs(stepPath, 0, 0, Nothing, errs, warns)
+    
+    If ok And errs = 0 Then
+        MsgBox "Succes! Opgeslagen als:" & vbCrLf & stepPath, vbInformation
+    Else
+        MsgBox "Export naar STEP is mislukt." & vbCrLf & _
+               "Pad: " & stepPath & vbCrLf & _
+               "Error code: " & errs & vbCrLf & _
+               "Warning code: " & warns, vbCritical
+    End If
+End Sub
